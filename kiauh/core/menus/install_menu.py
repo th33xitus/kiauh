@@ -81,21 +81,13 @@ class InstallMenu(BaseMenu):
         moonraker_setup.install_moonraker()
 
     def install_mainsail(self, **kwargs) -> None:
-        client: MainsailData = MainsailData()
-        if client.client_dir.exists():
-            ClientInstallMenu(client, self.__class__).run()
-        else:
-            install_client(client, settings=KiauhSettings())
+        self._install_client(MainsailData())
 
     def install_mainsail_config(self, **kwargs) -> None:
         install_client_config(MainsailData())
 
     def install_fluidd(self, **kwargs) -> None:
-        client: FluiddData = FluiddData()
-        if client.client_dir.exists():
-            ClientInstallMenu(client, self.__class__).run()
-        else:
-            install_client(client, settings=KiauhSettings())
+        self._install_client(FluiddData())
 
     def install_fluidd_config(self, **kwargs) -> None:
         install_client_config(FluiddData())
@@ -105,3 +97,10 @@ class InstallMenu(BaseMenu):
 
     def install_crowsnest(self, **kwargs) -> None:
         install_crowsnest()
+
+    def _install_client(self, client: MainsailData | FluiddData) -> None:
+        if client.client_dir.exists():
+            ClientInstallMenu(client, self.__class__).run()
+        else:
+            completion_msg = install_client(client, settings=KiauhSettings())
+            self.message_service.set_message(completion_msg)

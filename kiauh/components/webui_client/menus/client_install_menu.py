@@ -65,7 +65,8 @@ class ClientInstallMenu(BaseMenu):
         print(menu, end="")
 
     def reinstall_client(self, **kwargs) -> None:
-        install_client(self.client, settings=self.settings, reinstall=True)
+        completion_msg = install_client(self.client, settings=self.settings, reinstall=True)
+        self.message_service.set_message(completion_msg)
 
     def change_listen_port(self, **kwargs) -> None:
         curr_port = self._get_current_port()

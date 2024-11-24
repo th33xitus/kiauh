@@ -37,6 +37,7 @@ from components.webui_client.client_utils import (
 )
 from core.instance_manager.instance_manager import InstanceManager
 from core.logger import DialogType, Logger
+from core.services.message_service import Message
 from core.settings.kiauh_settings import KiauhSettings
 from core.types.color import Color
 from utils.common import backup_printer_config_dir, check_install_dependencies
@@ -55,14 +56,21 @@ def install_client(
     client: BaseWebClient,
     settings: KiauhSettings,
     reinstall: bool = False,
-) -> None:
+    ) -> Message:
+    completion_msg = Message(
+        title=f"{client.display_name} Installation Process completed",
+        color=Color.GREEN,
+        )
     mr_instances: List[Moonraker] = get_instances(Moonraker)
 
     enable_remotemode = False
     if not mr_instances:
         print_moonraker_not_found_dialog(client.display_name)
         if not get_confirm(f"Continue {client.display_name} installation?"):
-            return
+            completion_msg.color = Color.YELLOW
+            completion_msg.title = f"{client.display_name} Installation Process aborted"
+            completion_msg.text.append("Installation was aborted by the user!")
+            return completion_msg
 
     # if moonraker is not installed or multiple instances
     # are installed we enable mainsails remote mode
@@ -90,9 +98,9 @@ def install_client(
         default_port if reinstall else get_client_port_selection(client, settings)
     )
 
-    check_install_dependencies({"nginx"})
-
     try:
+        check_install_dependencies({"nginx"})
+
         download_client(client)
         if enable_remotemode and client.client == WebClientType.MAINSAIL:
             enable_mainsail_remotemode()
@@ -130,23 +138,17 @@ def install_client(
 
     except Exception as e:
         Logger.print_error(e)
-        Logger.print_dialog(
-            DialogType.ERROR,
-            center_content=True,
-            content=[f"{client.display_name} installation failed!"],
-        )
-        return
+        completion_msg.color = Color.RED
+        completion_msg.title = f"{client.display_name} Installation Process failed!"
+        completion_msg.text.append(
+            f"An unexpected error occured. Please see the output above. {client.display_name} installation failed!")
+        return completion_msg
 
     # noinspection HttpUrlsUsage
-    Logger.print_dialog(
-        DialogType.CUSTOM,
-        custom_title=f"{client.display_name} installation complete!",
-        custom_color=Color.GREEN,
-        center_content=True,
-        content=[
-            f"Open {client.display_name} now on: http://{get_ipv4_addr()}:{port}",
-        ],
-    )
+    completion_msg.text.append(
+        f"Open {client.display_name} now on: http://{get_ipv4_addr()}:{port}")
+
+    return completion_msg
 
 
 def download_client(client: BaseWebClient) -> None:
