@@ -12,8 +12,9 @@ import textwrap
 from typing import Type
 
 from components.moonraker import moonraker_remove
-from core.menus import Option
+from core.menus import FooterType, Option
 from core.menus.base_menu import BaseMenu
+from core.menus.utils.menu_utils import get_checkbox_state
 from core.types.color import Color
 
 
@@ -21,14 +22,17 @@ from core.types.color import Color
 class MoonrakerRemoveMenu(BaseMenu):
     def __init__(self, previous_menu: Type[BaseMenu] | None = None):
         super().__init__()
+
         self.title = "Remove Moonraker"
         self.title_color = Color.RED
         self.previous_menu: Type[BaseMenu] | None = previous_menu
+        self.footer_type = FooterType.BACK
+
         self.remove_moonraker_service = False
         self.remove_moonraker_dir = False
         self.remove_moonraker_env = False
         self.remove_moonraker_polkit = False
-        self.selection_state = False
+        self.select_state = False
 
     def set_previous_menu(self, previous_menu: Type[BaseMenu] | None) -> None:
         from core.menus.remove_menu import RemoveMenu
@@ -46,19 +50,18 @@ class MoonrakerRemoveMenu(BaseMenu):
         }
 
     def print_menu(self) -> None:
-        checked = f"[{Color.apply('x', Color.CYAN)}]"
-        unchecked = "[ ]"
-        o1 = checked if self.remove_moonraker_service else unchecked
-        o2 = checked if self.remove_moonraker_dir else unchecked
-        o3 = checked if self.remove_moonraker_env else unchecked
-        o4 = checked if self.remove_moonraker_polkit else unchecked
+        o1 = get_checkbox_state(self.remove_moonraker_service)
+        o2 = get_checkbox_state(self.remove_moonraker_dir)
+        o3 = get_checkbox_state(self.remove_moonraker_env)
+        o4 = get_checkbox_state(self.remove_moonraker_polkit)
+        sel_state = f"{'Select'if not self.select_state else 'Deselect'} everything"
         menu = textwrap.dedent(
             f"""
             ╟───────────────────────────────────────────────────────╢
             ║ Enter a number and hit enter to select / deselect     ║
             ║ the specific option for removal.                      ║
             ╟───────────────────────────────────────────────────────╢
-            ║  a) {self._get_selection_state_str():37}             ║
+            ║  a) {sel_state:49} ║
             ╟───────────────────────────────────────────────────────╢
             ║  1) {o1} Remove Service                                ║
             ║  2) {o2} Remove Local Repository                       ║
@@ -72,11 +75,11 @@ class MoonrakerRemoveMenu(BaseMenu):
         print(menu, end="")
 
     def toggle_all(self, **kwargs) -> None:
-        self.selection_state = not self.selection_state
-        self.remove_moonraker_service = self.selection_state
-        self.remove_moonraker_dir = self.selection_state
-        self.remove_moonraker_env = self.selection_state
-        self.remove_moonraker_polkit = self.selection_state
+        self.select_state = not self.select_state
+        self.remove_moonraker_service = self.select_state
+        self.remove_moonraker_dir = self.select_state
+        self.remove_moonraker_env = self.select_state
+        self.remove_moonraker_polkit = self.select_state
 
     def toggle_remove_moonraker_service(self, **kwargs) -> None:
         self.remove_moonraker_service = not self.remove_moonraker_service
@@ -97,32 +100,20 @@ class MoonrakerRemoveMenu(BaseMenu):
             and not self.remove_moonraker_env
             and not self.remove_moonraker_polkit
         ):
-            print(
-                Color.apply(
-                    "Nothing selected! Select options to remove first.", Color.RED
-                )
-            )
+            msg = "Nothing selected! Select options to remove first."
+            print(Color.apply(msg, Color.RED))
             return
 
-        moonraker_remove.run_moonraker_removal(
+        completion_msg = moonraker_remove.run_moonraker_removal(
             self.remove_moonraker_service,
             self.remove_moonraker_dir,
             self.remove_moonraker_env,
             self.remove_moonraker_polkit,
         )
+        self.message_service.set_message(completion_msg)
 
         self.remove_moonraker_service = False
         self.remove_moonraker_dir = False
         self.remove_moonraker_env = False
         self.remove_moonraker_polkit = False
-
-        self._go_back()
-
-    def _get_selection_state_str(self) -> str:
-        return (
-            "Select everything" if not self.selection_state else "Deselect everything"
-        )
-
-    def _go_back(self, **kwargs) -> None:
-        if self.previous_menu is not None:
-            self.previous_menu().run()
+        self.select_state = False

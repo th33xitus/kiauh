@@ -14,6 +14,7 @@ from typing import Type
 from components.klipper import klipper_remove
 from core.menus import FooterType, Option
 from core.menus.base_menu import BaseMenu
+from core.menus.utils.menu_utils import get_checkbox_state
 from core.types.color import Color
 
 
@@ -47,11 +48,9 @@ class KlipperRemoveMenu(BaseMenu):
         }
 
     def print_menu(self) -> None:
-        checked = f"[{Color.apply('x', Color.CYAN)}]"
-        unchecked = "[ ]"
-        o1 = checked if self.remove_klipper_service else unchecked
-        o2 = checked if self.remove_klipper_dir else unchecked
-        o3 = checked if self.remove_klipper_env else unchecked
+        o1 = get_checkbox_state(self.remove_klipper_service)
+        o2 = get_checkbox_state(self.remove_klipper_dir)
+        o3 = get_checkbox_state(self.remove_klipper_env)
         sel_state = f"{'Select'if not self.select_state else 'Deselect'} everything"
         menu = textwrap.dedent(
             f"""

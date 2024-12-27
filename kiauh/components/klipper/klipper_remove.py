@@ -46,11 +46,14 @@ def run_klipper_removal(
             Logger.print_info("No Klipper Services installed! Skipped ...")
 
     if (remove_dir or remove_env) and unit_file_exists("klipper", suffix="service"):
-        completion_msg.text = [
-            "Some Klipper services are still installed:",
-            f"● '{KLIPPER_DIR}' was not removed, even though selected for removal.",
-            f"● '{KLIPPER_ENV_DIR}' was not removed, even though selected for removal.",
-        ]
+        completion_msg.text.extend(
+            [
+                "\n\n",
+                "Some Klipper services are still installed:",
+                f"● '{KLIPPER_DIR}' was not removed.",
+                f"● '{KLIPPER_ENV_DIR}' was not removed.",
+            ]
+        )
     else:
         if remove_dir:
             Logger.print_status("Removing Klipper local repository ...")

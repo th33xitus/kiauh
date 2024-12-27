@@ -16,6 +16,8 @@ from components.moonraker import MOONRAKER_DIR, MOONRAKER_ENV_DIR
 from components.moonraker.moonraker import Moonraker
 from core.instance_manager.instance_manager import InstanceManager
 from core.logger import Logger
+from core.services.message_service import Message
+from core.types.color import Color
 from utils.fs_utils import run_remove_routines
 from utils.input_utils import get_selection_input
 from utils.instance_utils import get_instances
@@ -27,7 +29,12 @@ def run_moonraker_removal(
     remove_dir: bool,
     remove_env: bool,
     remove_polkit: bool,
-) -> None:
+) -> Message:
+    completion_msg = Message(
+        title="Moonraker Removal Process completed",
+        color=Color.GREEN,
+    )
+
     instances = get_instances(Moonraker)
 
     if remove_service:
@@ -35,27 +42,45 @@ def run_moonraker_removal(
         if instances:
             instances_to_remove = select_instances_to_remove(instances)
             remove_instances(instances_to_remove)
+            instance_names = [i.service_file_path.stem for i in instances_to_remove]
+            txt = f"● Moonraker instances removed: {', '.join(instance_names)}"
+            completion_msg.text.append(txt)
         else:
             Logger.print_info("No Moonraker Services installed! Skipped ...")
 
     delete_remaining: bool = remove_polkit or remove_dir or remove_env
     if delete_remaining and unit_file_exists("moonraker", suffix="service"):
-        Logger.print_info("There are still other Moonraker services installed")
-        Logger.print_info(
-            "●  Moonraker PolicyKit rules were not removed.", prefix=False
+        completion_msg.text.extend(
+            [
+                "\n\n",
+                "Some Moonraker services are still installed:",
+                "● Moonraker PolicyKit rules were not removed.",
+                f"● '{MOONRAKER_DIR}' was not removed.",
+                f"● '{MOONRAKER_ENV_DIR}' was not removed.",
+            ]
         )
-        Logger.print_info(f"● '{MOONRAKER_DIR}' was not removed.", prefix=False)
-        Logger.print_info(f"● '{MOONRAKER_ENV_DIR}' was not removed.", prefix=False)
     else:
         if remove_polkit:
             Logger.print_status("Removing all Moonraker policykit rules ...")
-            remove_polkit_rules()
+            if remove_polkit_rules():
+                completion_msg.text.append("● Moonraker PolicyKit rules removed")
         if remove_dir:
             Logger.print_status("Removing Moonraker local repository ...")
-            run_remove_routines(MOONRAKER_DIR)
+            if run_remove_routines(MOONRAKER_DIR):
+                completion_msg.text.append("● Moonraker local repository removed")
         if remove_env:
             Logger.print_status("Removing Moonraker Python environment ...")
-            run_remove_routines(MOONRAKER_ENV_DIR)
+            if run_remove_routines(MOONRAKER_ENV_DIR):
+                completion_msg.text.append("● Moonraker Python environment removed")
+
+    if completion_msg.text:
+        completion_msg.text.insert(0, "The following actions were performed:")
+    else:
+        completion_msg.color = Color.YELLOW
+        completion_msg.centered = True
+        completion_msg.text = ["Nothing to remove."]
+
+    return completion_msg
 
 
 def select_instances_to_remove(
@@ -97,19 +122,23 @@ def remove_instances(
         delete_moonraker_env_file(instance)
 
 
-def remove_polkit_rules() -> None:
+def remove_polkit_rules() -> bool:
     if not MOONRAKER_DIR.exists():
         log = "Cannot remove policykit rules. Moonraker directory not found."
         Logger.print_warn(log)
-        return
+        return False
 
     try:
         cmd = [f"{MOONRAKER_DIR}/scripts/set-policykit-rules.sh", "--clear"]
-        run(cmd, stderr=PIPE, stdout=DEVNULL, check=True)
+        result = run(cmd, stderr=PIPE, stdout=DEVNULL, check=True)
+        if result.returncode != 0:
+            raise CalledProcessError(result.returncode, cmd)
     except CalledProcessError as e:
         Logger.print_error(f"Error while removing policykit rules: {e}")
+        return False
 
     Logger.print_ok("Policykit rules successfully removed!")
+    return True
 
 
 def delete_moonraker_env_file(instance: Moonraker):
