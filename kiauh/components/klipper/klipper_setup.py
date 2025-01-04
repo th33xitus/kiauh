@@ -36,7 +36,9 @@ from components.webui_client.client_utils import (
 )
 from core.instance_manager.instance_manager import InstanceManager
 from core.logger import DialogType, Logger
+from core.services.message_service import Message
 from core.settings.kiauh_settings import KiauhSettings
+from core.types.color import Color
 from utils.common import check_install_dependencies
 from utils.git_utils import git_clone_wrapper, git_pull_wrapper
 from utils.input_utils import get_confirm
@@ -50,8 +52,14 @@ from utils.sys_utils import (
 )
 
 
-def install_klipper() -> None:
+def install_klipper() -> Message:
     Logger.print_status("Installing Klipper ...")
+
+    completion_msg = Message(
+        title="Klipper Installation Process completed",
+        text=["Klipper installation canceled by the user!"],
+        color=Color.YELLOW,
+    )
 
     klipper_list: List[Klipper] = get_instances(Klipper)
     moonraker_list: List[Moonraker] = get_instances(Moonraker)
@@ -60,19 +68,13 @@ def install_klipper() -> None:
     # if there are more moonraker instances than klipper instances, ask the user to
     # match the klipper instance count to the count of moonraker instances with the same suffix
     if len(moonraker_list) > len(klipper_list):
-        is_confirmed = display_moonraker_info(moonraker_list)
-        if not is_confirmed:
-            Logger.print_status(EXIT_KLIPPER_SETUP)
-            return
+        if not match_moonraker_instances(moonraker_list):
+            return completion_msg
         match_moonraker = True
 
     install_count, name_dict = get_install_count_and_name_dict(
         klipper_list, moonraker_list
     )
-
-    if install_count == 0:
-        Logger.print_status(EXIT_KLIPPER_SETUP)
-        return
 
     is_multi_install = install_count > 1 or (len(name_dict) >= 1 and install_count >= 1)
     if not name_dict and install_count == 1:
@@ -80,8 +82,7 @@ def install_klipper() -> None:
     elif is_multi_install and not match_moonraker:
         custom_names = use_custom_names_or_go_back()
         if custom_names is None:
-            Logger.print_status(EXIT_KLIPPER_SETUP)
-            return
+            return completion_msg
 
         handle_instance_names(install_count, name_dict, custom_names)
 
@@ -91,8 +92,10 @@ def install_klipper() -> None:
         run_klipper_setup(klipper_list, name_dict, create_example_cfg)
     except Exception as e:
         Logger.print_error(e)
-        Logger.print_error("Klipper installation failed!")
-        return
+        completion_msg.color = Color.RED
+        completion_msg.text = ["Klipper installation failed!"]
+
+    return completion_msg
 
 
 def run_klipper_setup(
@@ -155,7 +158,7 @@ def get_install_count_and_name_dict(
     return install_count, name_dict
 
 
-def setup_klipper_prerequesites() -> None:
+def setup_klipper_prerequesites() -> bool:
     settings = KiauhSettings()
     repo = settings.klipper.repo_url
     branch = settings.klipper.branch
@@ -170,6 +173,8 @@ def setup_klipper_prerequesites() -> None:
     except Exception:
         Logger.print_error("Error during installation of Klipper requirements!")
         raise
+
+    return True
 
 
 def install_klipper_packages() -> None:
@@ -223,7 +228,7 @@ def use_custom_names_or_go_back() -> bool | None:
     return _input
 
 
-def display_moonraker_info(moonraker_list: List[Moonraker]) -> bool:
+def match_moonraker_instances(moonraker_list: List[Moonraker]) -> bool:
     # todo: only show the klipper instances that are not already installed
     Logger.print_dialog(
         DialogType.INFO,

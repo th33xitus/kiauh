@@ -75,7 +75,8 @@ class InstallMenu(BaseMenu):
         print(menu, end="")
 
     def install_klipper(self, **kwargs) -> None:
-        klipper_setup.install_klipper()
+        completion_msg = klipper_setup.install_klipper()
+        self.message_service.set_message(completion_msg)
 
     def install_moonraker(self, **kwargs) -> None:
         moonraker_setup.install_moonraker()
